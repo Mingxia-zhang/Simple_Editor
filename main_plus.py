@@ -6,7 +6,7 @@ import tkinter.ttk as ttk
 import tkinter.font as tkFont
 from PIL import Image, ImageTk
 import os
-from config import ICONS, Format, shutcuts
+from config import ICONS, Format, shortcuts
                                                                                                                                                                                                                                                                                                    
 class Editor(Tk):
     def __init__(self):
@@ -24,6 +24,8 @@ class Editor(Tk):
         self._set_tool_bar()
         self._set_font_bar()
         self._set_body()
+        self._bind_shutcuts_func()
+        self._bind_other_func()
     def _main_window(self):
         self.title("Untitled - Script Editor")
         self.geometry("600x550")
@@ -63,13 +65,13 @@ class Editor(Tk):
         #Tool Menu
         tool_menu = Menu(menu)
         menu.add_cascade(label="Tools", menu=tool_menu, underline=0)
-        tool_menu.add_command(label="Change Color")
-        tool_menu.add_command(label="Search", compound='left', accelerator='Ctrl+F')
+        tool_menu.add_command(label="Change Color", command = self.change_color)
+        tool_menu.add_command(label="Search", command = self.find_text, compound='left', accelerator='Ctrl+F')
 
         # Help Menu
         help_menu = Menu(menu)
         menu.add_cascade(label="Help", menu=help_menu, underline=0)
-        help_menu.add_command(label="About", accelerator='Ctrl+H', underline=0)
+        help_menu.add_command(label="About", command = self.about, accelerator='Ctrl+H', underline=0)
     def _set_tool_bar(self):
         # TOOLBAR
         toolbar = Frame(self, pady=2)
@@ -98,14 +100,14 @@ class Editor(Tk):
         font_menu = ttk.Combobox(formattingbar, textvariable=self.all_fonts , state = "readonly")
         font_menu.pack(side="left", padx=4, pady=4)
         font_menu['values'] = ( 'Courier', 'Helvetica', 'Liberation Mono', 'OpenSymbol', 'Century Schoolbook L', 'DejaVu Sans Mono', 'Ubuntu Condensed', 'Ubuntu Mono', 'Lohit Punjabi', 'Mukti Narrow', 'Meera', 'Symbola', 'Abyssinica SIL')
-        #font_menu.bind('<<ComboboxSelected>>',change_font)
+        font_menu.bind('<<ComboboxSelected>>', self.change_font)
         font_menu.current(2)
         # size combobox
         self.all_size = StringVar()
         size_menu = ttk.Combobox(formattingbar, textvariable=self.all_size , state='readonly', width=5)
         size_menu.pack(side="left", padx=4, pady=4)
         size_menu['values'] = ('10', '12', '14', '16', '18', '20', '22', '24', '26', '28', '30')
-        #size_menu.bind('<<ComboboxSelected>>',change_size)
+        size_menu.bind('<<ComboboxSelected>>', self.change_size)
         size_menu.current(1)
         # FORMATBAR BUTTONS
         for font_item in Format:
@@ -132,7 +134,7 @@ class Editor(Tk):
         self.text_frame.pack(side="bottom", fill="both", expand=True)
         self.text.focus_set()
     def _bind_shutcuts_func(self):
-        for key, cmd in shortcuts:
+        for key, cmd in shortcuts.items():
             self.text.bind(key, getattr(self, cmd))
     def _bind_other_func(self):
         self.text.bind('<Key>', self.changeAction)
@@ -141,12 +143,12 @@ class Editor(Tk):
     def _exit(self):
         if self.changeFlag:
             ans = messagebox.askquestion(title="Save File" , message="Would you like to save this file")
-            if ans:
+            if ans == "yes":
                 self.save()
         if messagebox.askokcancel('Quit?','Are you sure to Quit?'):
             self.destroy()
 
-    def changeAction(self):
+    def changeAction(self, even = None):
         self.changeFlag = True
         self.title(self.file_name + "* - Script Editor")
         
@@ -156,36 +158,38 @@ class Editor(Tk):
             if ans is True:
                 self.save()
             self.delete_all()
-        self.file_name = "Untitled"
 
     def open_file(self, event=None):
         self.new()
         file = filedialog.askopenfile()
         self.file_name = file.name
+        self.title(self.file_name + " - Script Editor")
         self.text.insert(END, file.read())
+        self.saved = True
 
     def save(self, event=None):
-        if self.changeFlag:
-            path = filedialog.asksaveasfilename(title = self.file_name, filetypes=[("txt",".txt")])
+        if self.changeFlag and self.file_name.find(":"):
+            path = filedialog.asksaveasfilename(title = self.file_name)
             if path == "":
                 return
             else:
                 self.file_name = path
         self.title(self.file_name + " - Script Editor")
-        with open(path, mode='w') as f:
+        with open(self.file_name, mode='w') as f:
             f.write(self.text.get("1.0", END))
+        self.changeFlag = False
 
     def save_as(self, event=None):
-        path = filedialog.asksaveasfilename(title = self.file_name, filetypes=[("txt",".txt")])
         f = filedialog.asksaveasfile(mode='w')
         if f is None: 
             return
-        if path != "":
-            self.file_name = path
+        else:
+            self.file_name = f.name
         self.title(self.file_name + " - Script Editor")
         text2save = str(self.text.get(1.0, END)) 
         f.write(text2save)
         f.close()
+        self.changeFlag = False
 
     def rename(self, event=None):
         if self.file_name == "":
@@ -262,8 +266,8 @@ class Editor(Tk):
             overstrike = 0
 
         big_font = tkFont.Font(self.text, self.text.cget("font"))
-        big_font.configure(slant= slant , weight= weight , underline= underline , overstrike= overstrike , family= current_font_family , size= current_font_size )
-        self.text.tag_config("BigTag", font=big_font , foreground= fontColor , background= fontBackground) 
+        big_font.configure(slant= slant , weight= weight , underline= underline , overstrike= overstrike , family= self.current_font_family , size= self.current_font_size )
+        self.text.tag_config("BigTag", font=big_font , foreground= self.fontColor , background= self.fontBackground) 
         if "BigTag" in  current_tags:
             self.text.tag_remove("BigTag" , 1.0 , END)
         self.text.tag_add("BigTag" , 1.0 , END)
@@ -278,6 +282,16 @@ class Editor(Tk):
         else:
             # first char is normal, so bold the whole selection
             self.text.tag_add("font_color_change", 1.0 , END)
+        self.make_tag()
+
+    def change_font(self, event):
+        f = self.all_fonts.get()
+        self.current_font_family = f
+        self.make_tag()
+
+    def change_size(self, event):
+        sz = int(self.all_size.get())
+        self.current_font_size = sz
         self.make_tag()
 
     # Adding Search Functionality
@@ -306,11 +320,11 @@ class Editor(Tk):
         search_entry_widget = Entry(search_toplevel, width=25)
         search_entry_widget.grid(row=0, column=1, padx=2, pady=2, sticky='we')
         search_entry_widget.focus_set()
-        Button(search_toplevel, text="Ok", underline=0, command=lambda: check( search_entry_widget.get())).grid(row=0, column=2, sticky='e' +'w', padx=2, pady=5)
-        Button(search_toplevel, text="Cancel", underline=0, command=lambda: find_text_cancel_button(search_toplevel)).grid(row=0, column=4, sticky='e' +'w', padx=2, pady=2)
+        Button(search_toplevel, text="Ok", underline=0, command=lambda: self.check( search_entry_widget.get())).grid(row=0, column=2, sticky='e' +'w', padx=2, pady=5)
+        Button(search_toplevel, text="Cancel", underline=0, command=lambda: self.find_text_cancel_button(search_toplevel)).grid(row=0, column=4, sticky='e' +'w', padx=2, pady=2)
 
     # remove search tags and destroys the search box
-    def find_text_cancel_button(search_toplevel):
+    def find_text_cancel_button(self, search_toplevel):
         self.text.tag_remove('found', '1.0', END)
         search_toplevel.destroy()
         return "break"
@@ -400,14 +414,16 @@ class Editor(Tk):
     # called when <<combobox>> event is called
 
     def change_font(self, event):
-        f = all_fonts.get()
+        f = self.all_fonts.get()
         self.current_font_family = f
         self.make_tag()
 
     def change_size(self, event):
-        sz = int(all_size.get())
+        sz = int(self.all_size.get())
         self.current_font_size = sz
         self.make_tag()
+    def about(self, event=None):
+        messagebox.showinfo("About", "Simple Text Editor\nCreated in Python using Tkinter\nCopyright 2020")
 
 if __name__ == '__main__':
     app = Editor()
